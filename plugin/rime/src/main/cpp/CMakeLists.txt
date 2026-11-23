@@ -1,0 +1,130 @@
+cmake_minimum_required(VERSION 3.18)
+
+project(fcitx5-android-plugin-rime VERSION ${VERSION_NAME})
+
+# For reproducible build
+add_link_options("LINKER:--hash-style=gnu,--build-id=none")
+
+# prefab dependency
+find_package(fcitx5 REQUIRED CONFIG)
+get_target_property(FCITX5_CMAKE_MODULES fcitx5::cmake INTERFACE_INCLUDE_DIRECTORIES)
+set(CMAKE_MODULE_PATH ${FCITX5_CMAKE_MODULES} ${CMAKE_MODULE_PATH})
+
+find_package(ECM MODULE)
+find_package(Fcitx5Core MODULE)
+find_package(Fcitx5Module MODULE)
+
+set(Rime_VERSION "1.12.0")
+set(Rime_dependencies
+        log # glog links to android log
+        "${PREBUILT_DIR}/glog/${ANDROID_ABI}/lib/libglog.a"
+        "${PREBUILT_DIR}/leveldb/${ANDROID_ABI}/lib/libleveldb.a"
+        "${PREBUILT_DIR}/lua/${ANDROID_ABI}/lib/liblua_static.a"
+        "${PREBUILT_DIR}/marisa/${ANDROID_ABI}/lib/libmarisa.a"
+        "${PREBUILT_DIR}/opencc/${ANDROID_ABI}/lib/libopencc.a"
+        "${PREBUILT_DIR}/yaml-cpp/${ANDROID_ABI}/lib/libyaml-cpp.a"
+        )
+
+add_library(Rime_static STATIC IMPORTED)
+set_target_properties(Rime_static PROPERTIES
+        IMPORTED_LOCATION "${PREBUILT_DIR}/librime/${ANDROID_ABI}/lib/librime.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${PREBUILT_DIR}/librime/${ANDROID_ABI}/include"
+        INTERFACE_LINK_LIBRARIES "${Rime_dependencies}"
+        )
+
+# https://github.com/rime/librime/blob/1.9.0/src/rime_api.h#L663
+# https://stackoverflow.com/questions/805555/ld-linker-question-the-whole-archive-option
+# https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#link-features
+set(RIME_TARGET $<LINK_LIBRARY:WHOLE_ARCHIVE,Rime_static>)
+set(RIME_DATA_DIR "${CMAKE_INSTALL_DATADIR}/rime-data")
+add_subdirectory(fcitx5-rime)
+
+install(FILES
+        "default.yaml"
+        "rime-prelude/key_bindings.yaml"
+        "rime-prelude/punctuation.yaml"
+        "rime-prelude/symbols.yaml"
+        # 下列 luna_pinyin / stroke 文件不在 schema_list（菜单不出现），
+        # 但西安话两方案的反查（Q 普通话拼音 / X 笔画）依赖它们编译词典，必须保留
+        "rime-luna-pinyin/luna_pinyin.dict.yaml"
+        "rime-luna-pinyin/luna_pinyin.schema.yaml"
+        "rime-luna-pinyin/luna_quanpin.schema.yaml"
+        "rime-luna-pinyin/pinyin.yaml"
+        "rime-stroke/stroke.dict.yaml"
+        "rime-stroke/stroke.schema.yaml"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
+        COMPONENT prebuilt-assets
+        )
+
+# wugniu_suwu (吴语混合腔) scheme files
+install(FILES
+        "rime-wugniu-suwu/wugniu_suwu.schema.yaml"
+        "rime-wugniu-suwu/wugniu_suwu.dict.yaml"
+        "rime-wugniu-suwu/wugniu_lumozy.schema.yaml"
+        "rime-wugniu-suwu/wugniu_suwu.gram"
+        "rime-wugniu-suwu/wuphin.word.dict.yaml"
+        "rime-wugniu-suwu/wuphin.map.dict.yaml"
+        "rime-wugniu-suwu/wuphin.phrases.dict.yaml"
+        "rime-wugniu-suwu/sougouciku.dict.yaml"
+        "rime-wugniu-suwu/symbols_wu.yaml"
+        "rime-wugniu-suwu/wugniuji.ico"
+        "rime-wugniu-suwu/wugniuji.png"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
+        COMPONENT prebuilt-assets
+        )
+
+# xinganhua (西安话·关中片) scheme files
+# 城区音 chengqyu、南郊音 nanjiao 两套方案，各三个文件：
+# schema + 主词典（import_tables 指向字音表）+ 字音表
+# 反查依赖 luna_pinyin / stroke，两个上游方案已随本体装好，无需另外加
+install(FILES
+        "rime-xinganhua/chengqyu.schema.yaml"
+        "rime-xinganhua/chengqyu.dict.yaml"
+        "rime-xinganhua/chengqyu.word.dict.yaml"
+        "rime-xinganhua/nanjiao.schema.yaml"
+        "rime-xinganhua/nanjiao.dict.yaml"
+        "rime-xinganhua/nanjiao.word.dict.yaml"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
+        COMPONENT prebuilt-assets
+        )
+
+# wugniu_suwu OpenCC config files
+# NOTE: TSCharacters.ocd2 / TSPhrases.ocd2 由本体提供（usr/share/opencc），
+#       插件重复安装会与 Main 的路径冲突，导致整个插件数据被跳过（Rime 无法加载）。
+#       本体已通过符号链接 usr/share/rime-data/opencc -> usr/share/opencc 提供给 rime 使用。
+install(FILES
+        "rime-wugniu-suwu/opencc/s2sy.json"
+        "rime-wugniu-suwu/opencc/s2wy.json"
+        "rime-wugniu-suwu/opencc/t2sy.json"
+        "rime-wugniu-suwu/opencc/t2wy.json"
+        "rime-wugniu-suwu/opencc/SWCharacters.txt"
+        "rime-wugniu-suwu/opencc/SWPhrases.txt"
+        "rime-wugniu-suwu/opencc/SYCharacters.txt"
+        "rime-wugniu-suwu/opencc/TSCharacters.txt"
+        "rime-wugniu-suwu/opencc/TSPhrases.txt"
+        "rime-wugniu-suwu/opencc/TSCharacters.ocd"
+        "rime-wugniu-suwu/opencc/TSPhrases.ocd"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/opencc"
+        COMPONENT prebuilt-assets
+        )
+
+# wugniu_lumozy (吳語拼音文) 个 Lua 脚本
+# librime-lua 拿 <shared_data_dir>/lua/?.lua 搭 <shared_data_dir>/lua/?/init.lua
+# 侪摆进 package.path，所以脚本装到 rime-data/lua 下向就好寻着，
+# schema 里个 lua_processor@*lumozy*… / lua_filter@*lumozy*… 正好引用。
+install(FILES
+        "rime-wugniu-suwu/lua/lumozy.lua"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/lua"
+        COMPONENT prebuilt-assets
+        )
+
+# 预编译 Rime 词库（CI 上由 rime_deployer 生成，见 .github/workflows/build-custom.yml）
+# 产物放 usr/share/rime-data/build/ = librime 的 prebuilt_data_dir，
+# 启动时先于 user_data/build 加载，实现「安装即可用、免手动部署」。
+# 目录不存在时（本地直接构建）自动跳过，Rime 回落到首次启动正常部署。
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rime-wugniu-suwu/build/.buildinfo")
+    install(DIRECTORY "rime-wugniu-suwu/build/"
+            DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/build"
+            COMPONENT prebuilt-assets
+            )
+endif ()

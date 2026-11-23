@@ -1,0 +1,116 @@
+name: Build Custom APK
+
+on:
+  push:
+    branches: [ "master", "main", "build/*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v4
+        with:
+          packages: cmake;3.31.6
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install extra-cmake-modules gettext \
+            libboost-dev libboost-iostreams-dev libboost-system-dev \
+            libglog-dev libleveldb-dev libmarisa-dev libopencc-dev libyaml-cpp-dev
+
+      # 预编译 Rime 词库：在构建机上（对齐 prebuilt 子模块的 librime 1.12.0）
+      # 用 rime_deployer 把 4 个方案与全部词典编译成 table/prism/reverse 产物，
+      # 连同 .buildinfo 版本戳打进 APK assets（usr/share/rime-data/build/，
+      # 即 librime 的 prebuilt_data_dir）。手机端启动时直接加载，
+      # 免手动部署、免在手机上编译——这也是大词表能放回包里的前提。
+      - name: Prebuild Rime dictionaries
+        run: |
+          set -euo pipefail
+          LIBRIME_VER=1.12.0
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o librime.tar.gz "https://github.com/rime/librime/archive/refs/tags/${LIBRIME_VER}.tar.gz"
+          tar xzf librime.tar.gz
+          cmake -S "librime-${LIBRIME_VER}" -B librime-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build librime-build --target rime_deployer -j"$(nproc)"
+          DEPLOYER=$(find librime-build -type f -name rime_deployer | head -1)
+          test -n "$DEPLOYER" && echo "rime_deployer: $DEPLOYER"
+          SRC="$GITHUB_WORKSPACE/plugin/rime/src/main/cpp"
+          OUT="$RUNNER_TEMP/rime-user"
+          rm -rf "$OUT" && mkdir -p "$OUT"
+          # --build [user_data_dir] [shared_data_dir] [staging_dir]
+          "$DEPLOYER" --build "$OUT" "$SRC" "$OUT"
+          mkdir -p "$SRC/rime-wugniu-suwu/build"
+          cp -a "$OUT/build/." "$SRC/rime-wugniu-suwu/build/"
+          HASH=$(
+            ( cd "$SRC" && find . -path './rime-wugniu-suwu/build' -prune -o -name '*.yaml' -print \
+              | LC_ALL=C sort | xargs sha256sum ) | sha256sum | cut -d' ' -f1)
+          printf 'schema=%s\nlibrime=%s\ndate=%s\n' "$HASH" "$LIBRIME_VER" "$(date -u +%FT%TZ)" \
+            > "$SRC/rime-wugniu-suwu/build/.buildinfo"
+          ls -la "$SRC/rime-wugniu-suwu/build"
+
+      # 固定签名：secrets 与旧直装包同一把密钥体系，保证 release 产物已签名
+      - name: Build Release APK
+        shell: bash
+        env:
+          SIGN_KEY_BASE64: ${{ secrets.SIGN_KEY_BASE64 }}
+          SIGN_KEY_PWD: ${{ secrets.SIGN_KEY_PWD }}
+          SIGN_KEY_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
+        run: |
+          set -o pipefail
+          if [ -z "$SIGN_KEY_BASE64" ]; then
+            echo "::error::SIGN_KEY_BASE64 未配置，release 产物将无法签名"
+            exit 1
+          fi
+          ./gradlew :app:assembleRelease 2>&1 | tee build-main.log
+
+      - name: Verify APKs are signed
+        shell: bash
+        run: |
+          set -e
+          UNSIGNED=$(find app/build/outputs/apk -name "*-unsigned.apk" 2>/dev/null | head -5)
+          if [ -n "$UNSIGNED" ]; then
+            echo "::error::发现未签名产物：$UNSIGNED"
+            exit 1
+          fi
+          echo "已签名 APK 数量：$(find app/build/outputs/apk/release -name '*.apk' 2>/dev/null | wc -l)"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: iris-keyboard-apk
+          path: app/build/outputs/apk/release/
+
+      - name: Save failure log to ci-logs branch
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p /tmp/cilog
+          tail -c 300000 build-main.log > /tmp/cilog/build-main.log 2>/dev/null || true
+          cd /tmp/cilog
+          if [ ! -s build-main.log ]; then exit 0; fi
+          git init -q
+          git config user.email "ci-bot@users.noreply.github.com"
+          git config user.name "ci-log-bot"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git checkout -q -B ci-logs
+          git add -A
+          git commit -q -m "ci failure log for ${{ github.sha }}" || true
+          git push -q -f origin ci-logs

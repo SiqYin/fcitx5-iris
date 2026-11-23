@@ -1,0 +1,82 @@
+name: Publish Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Wait for green build of this commit
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.sha }}"
+          # 只认 tag 推送前后（含同一次 push 触发）创建的构建，防止把旧版本号产物挂到新 Release；
+          # 发布时须分支与 tag 同一次 push，构建发生在 tag 已存在之后，APK versionName 即为 tag 本身
+          CUTOFF=$(date -u -d '90 seconds ago' +%Y-%m-%dT%H:%M:%SZ)
+          RUN=""
+          for i in $(seq 1 60); do
+            RUN=$(gh run list -R "${{ github.repository }}" --workflow build-custom.yml --status success --limit 30 \
+              --json databaseId,headSha,createdAt \
+              | jq -r --arg sha "$SHA" --arg cutoff "$CUTOFF" \
+              '(.[] | select(.headSha == $sha and .createdAt >= $cutoff) | .databaseId) // ""')
+            if [ -n "$RUN" ]; then
+              echo "Found green build run: $RUN"
+              break
+            fi
+            echo "Waiting for a green build of $SHA (attempt $i/60)..."
+            sleep 120
+          done
+          if [ -z "$RUN" ]; then
+            echo "::error::No green build-custom run found for $SHA within 2 hours (build not triggered, failed, or still running)"
+            exit 1
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ steps.run.outputs.run }}" -R "${{ github.repository }}" -D artifacts
+
+      - name: Create release and upload APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          cat > notes.md <<'NOTES'
+          ## 小鸢输入法 Iris Keyboard
+
+          基于上游 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) 的独立发行版（单 APK），
+          内置四个 Rime 输入方案：
+
+          | 方案 | 说明 | 来源 |
+          |---|---|---|
+          | 吴语·苏沪混合腔（wugniu_suwu） | 含 octagram 语法模型 | [wugniu_suwu](https://github.com/SiqYin/wugniu_suwu) |
+          | 吴语拼音文（wugniu_lumozy） | 汉字 ⇄ 拼音文 | 同上 |
+          | 西安话·城区音（chengqyu） | Q 普通话反查、X 笔画反查 | [android-xinganhua](https://github.com/SiqYin/android-xinganhua) |
+          | 西安话·南郊音（nanjiao） | 同上 | 同上 |
+
+          **开箱即用**：词库已在构建机上预编译（构建流程内置 librime 部署工具），
+          安装并激活后无需手动「部署」，第一次切到键盘即可输入。
+
+          ## 安装
+
+          1. 下载与本机 ABI 对应的 **一个** APK（一般手机选 **arm64-v8a**）；
+          2. 安装后打开应用，按引导在系统设置里启用并切换到「小鸢输入法」；
+          3. 直接输入。方案菜单在键盘上按 `Ctrl+`` 或 F4（软键盘长按菜单）切换。
+
+          ## 与旧直装包的关系
+
+          本仓库取代 [fcitx5-wugniu](https://github.com/SiqYin/fcitx5-wugniu)（吴语）与
+          [android-xinganhua](https://github.com/SiqYin/android-xinganhua)（西安话）两个直装包，
+          两包已暂停更新。应用包名不同，可与旧包并存安装；装好并确认数据无误后可卸载旧包。
+          NOTES
+          gh release create "$TAG" -R "${{ github.repository }}" --title "小鸢输入法 Iris Keyboard $TAG" --notes-file notes.md
+          find artifacts -name "*.apk" -print0 | xargs -0 gh release upload "$TAG" -R "${{ github.repository }}" --clobber
