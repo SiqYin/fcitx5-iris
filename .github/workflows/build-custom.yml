@@ -50,8 +50,8 @@ jobs:
           tar xzf librime.tar.gz
           cmake -S "librime-${LIBRIME_VER}" -B librime-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=OFF
           cmake --build librime-build --target rime_deployer -j"$(nproc)"
-          DEPLOYER=$(find librime-build -type f -name rime_deployer | head -1)
-          test -n "$DEPLOYER" && echo "rime_deployer: $DEPLOYER"
+          DEPLOYER="$RUNNER_TEMP/librime-build/bin/rime_deployer"
+          test -x "$DEPLOYER" && echo "rime_deployer: $DEPLOYER"
           SRC="$GITHUB_WORKSPACE/plugin/rime/src/main/cpp"
           OUT="$RUNNER_TEMP/rime-user"
           rm -rf "$OUT" && mkdir -p "$OUT"
