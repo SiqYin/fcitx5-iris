@@ -55,8 +55,21 @@ jobs:
           SRC="$GITHUB_WORKSPACE/plugin/rime/src/main/cpp"
           OUT="$RUNNER_TEMP/rime-user"
           rm -rf "$OUT" && mkdir -p "$OUT"
+          # 搭建平铺的 shared_data staging（模拟 CMake install 后的 rime-data 布局，
+          # rime_deployer 的 config_compiler 只在 shared_data_dir 根找 __include 资源）
+          STAGE="$RUNNER_TEMP/rime-shared"
+          rm -rf "$STAGE" && mkdir -p "$STAGE"
+          cp default.yaml "$STAGE/"
+          cp rime-prelude/key_bindings.yaml rime-prelude/punctuation.yaml rime-prelude/symbols.yaml "$STAGE/"
+          cp rime-luna-pinyin/luna_pinyin.dict.yaml rime-luna-pinyin/luna_pinyin.schema.yaml \
+             rime-luna-pinyin/luna_quanpin.schema.yaml rime-luna-pinyin/pinyin.yaml "$STAGE/"
+          cp rime-stroke/stroke.dict.yaml rime-stroke/stroke.schema.yaml "$STAGE/"
+          cp rime-essay/essay.txt "$STAGE/"
+          cp rime-wugniu-suwu/*.yaml "$STAGE/"
+          cp rime-xinganhua/*.yaml "$STAGE/"
+          cp -r rime-wugniu-suwu/lua "$STAGE/lua"
           # --build [user_data_dir] [shared_data_dir] [staging_dir]
-          "$DEPLOYER" --build "$OUT" "$SRC" "$OUT"
+          "$DEPLOYER" --build "$OUT" "$STAGE" "$OUT"
           mkdir -p "$SRC/rime-wugniu-suwu/build"
           cp -a "$OUT/build/." "$SRC/rime-wugniu-suwu/build/"
           HASH=$(
