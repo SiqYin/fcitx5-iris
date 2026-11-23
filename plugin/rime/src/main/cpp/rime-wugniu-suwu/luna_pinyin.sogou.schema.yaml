@@ -3,11 +3,16 @@
 # 共享搜狗词库的承载 schema：不进 default.yaml 的 schema_list（菜单不出现），
 # 由 wugniu_suwu / chengqyu / nanjiao 的 schema/dependencies 触发，
 # 编译出唯一一份 luna_pinyin.sogou 的 table/prism 供四个方案共用。
+# 各方案以 script_translator@sogou（dictionary: luna_pinyin.sogou）引用本表。
 
 ---
-name: luna_pinyin.sogou
-version: "1.0"
-sort: by_weight
-use_preset_vocabulary: true
+schema:
+  schema_id: luna_pinyin.sogou
+  name: 搜狗詞庫
+  version: "1.0"
+
+translator:
+  dictionary: luna_pinyin.sogou
+  prism: luna_pinyin.sogou
 
 ...
