@@ -48,7 +48,7 @@ jobs:
           cd "$RUNNER_TEMP"
           curl -sSfL -o librime.tar.gz "https://github.com/rime/librime/archive/refs/tags/${LIBRIME_VER}.tar.gz"
           tar xzf librime.tar.gz
-          cmake -S "librime-${LIBRIME_VER}" -B librime-build -DCMAKE_BUILD_TYPE=Release
+          cmake -S "librime-${LIBRIME_VER}" -B librime-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=OFF
           cmake --build librime-build --target rime_deployer -j"$(nproc)"
           DEPLOYER=$(find librime-build -type f -name rime_deployer | head -1)
           test -n "$DEPLOYER" && echo "rime_deployer: $DEPLOYER"
