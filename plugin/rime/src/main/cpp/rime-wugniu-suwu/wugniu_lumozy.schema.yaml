@@ -78,6 +78,7 @@ engine:
   translators:
     - script_translator
     - reverse_lookup_translator
+    - script_translator@sogou    # 共享搜狗詞庫
     - script_translator@luna_pinyin
     - table_translator@stroke
     - table_translator@custom_phrase

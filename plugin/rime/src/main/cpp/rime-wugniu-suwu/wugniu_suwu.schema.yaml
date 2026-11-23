@@ -20,6 +20,7 @@ schema:
   dependencies:
     - luna_pinyin
     - stroke
+    - luna_pinyin.sogou
   icon: wugniuji.ico
 
 switches:
@@ -54,7 +55,9 @@ engine:
     - fallback_segmentor
   translators:
     - punct_translator
+    - script_translator
     - script_translator              # 主翻譯器
+    - script_translator@sogou    # 共享搜狗詞庫
     - reverse_lookup_translator
     - script_translator@luna_pinyin  # 用於反查个luna_pinyin翻譯器
     - table_translator@stroke        # 用於反查个stroke翻譯器
@@ -154,6 +157,13 @@ grammar:
   collocation_min_length: 2  # 弗可省，否則 2-gram 命中會畀 weak 懲罰壓脫
   collocation_max_length: 6  # 對應模型實際構建个 2–6 階
 
+  # 共享搜狗詞庫：全量表獨立編譯一份（見 luna_pinyin.sogou.schema.yaml），
+  # 四個方案个 script_translator@sogou 共用同一份 table/prism，弗再各自 import。
+  sogou:
+    tag: abc
+    dictionary: luna_pinyin.sogou
+    prism: luna_pinyin.sogou
+    initial_quality: 1
 # 副翻譯器1 明月拼音
 luna_pinyin:
   tag: luna_pinyin

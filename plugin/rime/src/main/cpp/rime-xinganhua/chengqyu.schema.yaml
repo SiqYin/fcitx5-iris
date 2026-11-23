@@ -19,6 +19,7 @@ schema:
   dependencies:
     - luna_pinyin
     - stroke
+    - luna_pinyin.sogou
 
 switches:
   - name: ascii_mode
@@ -54,6 +55,7 @@ engine:
   translators:
     - punct_translator
     - script_translator
+    - script_translator@sogou    # 共享搜狗詞庫
     - reverse_lookup_translator
     - script_translator@luna_pinyin
     - table_translator@stroke
@@ -105,6 +107,13 @@ translator:
   # comment_format:
   #   - xform/\d//
 
+  # 共享搜狗詞庫：全量表獨立編譯一份（見 luna_pinyin.sogou.schema.yaml），
+  # 四個方案个 script_translator@sogou 共用同一份 table/prism，弗再各自 import。
+  sogou:
+    tag: abc
+    dictionary: luna_pinyin.sogou
+    prism: luna_pinyin.sogou
+    initial_quality: 1
 # 副翻譯器 1：普通話拼音反查
 luna_pinyin:
   tag: luna_pinyin

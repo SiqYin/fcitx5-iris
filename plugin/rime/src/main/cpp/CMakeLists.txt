@@ -68,6 +68,7 @@ install(FILES
         "rime-wugniu-suwu/wuphin.phrases.dict.yaml"
         "rime-wugniu-suwu/sougouciku.dict.yaml"
         "rime-wugniu-suwu/luna_pinyin.sogou.dict.yaml"
+        "rime-wugniu-suwu/luna_pinyin.sogou.schema.yaml"
         "rime-wugniu-suwu/symbols_wu.yaml"
         "rime-wugniu-suwu/wugniuji.ico"
         "rime-wugniu-suwu/wugniuji.png"

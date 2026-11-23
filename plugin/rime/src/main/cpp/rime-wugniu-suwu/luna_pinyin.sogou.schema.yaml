@@ -1,0 +1,13 @@
+# Rime schema
+# encoding: utf-8
+# 共享搜狗词库的承载 schema：不进 default.yaml 的 schema_list（菜单不出现），
+# 由 wugniu_suwu / chengqyu / nanjiao 的 schema/dependencies 触发，
+# 编译出唯一一份 luna_pinyin.sogou 的 table/prism 供四个方案共用。
+
+---
+name: luna_pinyin.sogou
+version: "1.0"
+sort: by_weight
+use_preset_vocabulary: true
+
+...
