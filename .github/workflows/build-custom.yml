@@ -59,6 +59,7 @@ jobs:
           # rime_deployer 的 config_compiler 只在 shared_data_dir 根找 __include 资源）
           STAGE="$RUNNER_TEMP/rime-shared"
           rm -rf "$STAGE" && mkdir -p "$STAGE"
+          cd "$SRC"
           cp default.yaml "$STAGE/"
           cp rime-prelude/key_bindings.yaml rime-prelude/punctuation.yaml rime-prelude/symbols.yaml "$STAGE/"
           cp rime-luna-pinyin/luna_pinyin.dict.yaml rime-luna-pinyin/luna_pinyin.schema.yaml \
