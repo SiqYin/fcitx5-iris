@@ -42,6 +42,9 @@ jobs:
       # 即 librime 的 prebuilt_data_dir）。手机端启动时直接加载，
       # 免手动部署、免在手机上编译——这也是大词表能放回包里的前提。
       - name: Prebuild Rime dictionaries
+        env:
+          GLOG_logtostderr: "1"
+          GLOG_colorlogtostderr: "1"
         run: |
           set -euo pipefail
           LIBRIME_VER=1.12.0
