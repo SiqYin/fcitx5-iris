@@ -69,6 +69,9 @@ jobs:
           cp rime-wugniu-suwu/*.yaml "$STAGE/"
           cp rime-xinganhua/*.yaml "$STAGE/"
           cp -r rime-wugniu-suwu/lua "$STAGE/lua"
+          # 先单独 verbose 编译共享搜狗词库（依赖/错误细节都打出来；
+          # 产物留在 staging，后续 --build 会经 checksum 对比直接复用）
+          "$DEPLOYER" --compile "$STAGE/luna_pinyin.sogou.schema.yaml" "$OUT" "$STAGE" "$OUT"
           # --build [user_data_dir] [shared_data_dir] [staging_dir]
           # staging_dir 即产物目录本身（librime 直接往里写编译产物）
           "$DEPLOYER" --build "$OUT" "$STAGE" "$OUT"
