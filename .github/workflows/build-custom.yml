@@ -34,7 +34,7 @@ jobs:
           sudo apt update
           sudo apt install extra-cmake-modules gettext \
             libboost-dev libboost-iostreams-dev libboost-system-dev \
-            libglog-dev libleveldb-dev libmarisa-dev libopencc-dev libyaml-cpp-dev
+            libgoogle-glog-dev libleveldb-dev libmarisa-dev libopencc-dev libyaml-cpp-dev
 
       # 预编译 Rime 词库：在构建机上（对齐 prebuilt 子模块的 librime 1.12.0）
       # 用 rime_deployer 把 4 个方案与全部词典编译成 table/prism/reverse 产物，

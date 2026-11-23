@@ -20,6 +20,9 @@
 [submodule "plugin/rime/src/main/cpp/rime-prelude"]
 	path = plugin/rime/src/main/cpp/rime-prelude
 	url = https://github.com/rime/rime-prelude.git
+[submodule "plugin/rime/src/main/cpp/rime-essay"]
+	path = plugin/rime/src/main/cpp/rime-essay
+	url = https://github.com/rime/rime-essay.git
 [submodule "plugin/rime/src/main/cpp/rime-luna-pinyin"]
 	path = plugin/rime/src/main/cpp/rime-luna-pinyin
 	url = https://github.com/rime/rime-luna-pinyin.git
