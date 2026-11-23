@@ -1,5 +1,9 @@
 # 小鸢输入法 Iris Keyboard
 
+![Image 1: Iris Keyboard](https://raw.githubusercontent.com/SiqYin/fcitx5-iris/main/brand/readme-hero-circle.png)
+
+> 临时 logo：取自 [BewlyIris](https://github.com/SiqYin/BewlyIris) 的鸢尾花品牌图案，后续会替换为小鸢输入法自己的正式 logo。
+
 **小鸢输入法**（Iris Keyboard）是 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)（小企鹅输入法）的独立发行版：把 Rime 输入引擎与四套方言方案直接打进**一个 APK**，词库在构建机上预编译好随包分发，安装激活后**开箱即用**——不再需要装插件 APK，也不再需要手动「部署」。
 
 ## 内置方案
@@ -25,7 +29,7 @@
 
 ## 与旧直装包的关系
 
-本仓库是 [SiqYin/fcitx5-wugniu](https://github.com/SiqYin/fcitx5-wugniu)（吴语直装包）与 [SiqYin/android-xinganhua](https://github.com/SiqYin/android-xinganhua)（西安话直装包）的合并继任者，两库已暂停更新。包名不同（`io.github.siqyin.iris`），可与旧包并存安装，确认数据无误后卸载旧包即可。
+本仓库整合了 [SiqYin/fcitx5-wugniu](https://github.com/SiqYin/fcitx5-wugniu)（吴语）与 [SiqYin/android-xinganhua](https://github.com/SiqYin/android-xinganhua)（西安话）两个直装包的输入方案。包名不同（`io.github.siqyin.iris`），可与旧包并存安装。
 
 ## 开箱即用的原理
 
