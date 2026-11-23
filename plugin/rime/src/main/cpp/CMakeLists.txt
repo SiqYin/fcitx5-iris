@@ -123,7 +123,7 @@ install(FILES
 # 产物放 usr/share/rime-data/build/ = librime 的 prebuilt_data_dir，
 # 启动时先于 user_data/build 加载，实现「安装即可用、免手动部署」。
 # 目录不存在时（本地直接构建）自动跳过，Rime 回落到首次启动正常部署。
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rime-wugniu-suwu/build/.buildinfo")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rime-wugniu-suwu/build/buildinfo.txt")
     install(DIRECTORY "rime-wugniu-suwu/build/"
             DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/build"
             COMPONENT prebuilt-assets

@@ -80,7 +80,7 @@ jobs:
             ( cd "$SRC" && find . -path './rime-wugniu-suwu/build' -prune -o -name '*.yaml' -print \
               | LC_ALL=C sort | xargs sha256sum ) | sha256sum | cut -d' ' -f1)
           printf 'schema=%s\nlibrime=%s\ndate=%s\n' "$HASH" "$LIBRIME_VER" "$(date -u +%FT%TZ)" \
-            > "$SRC/rime-wugniu-suwu/build/.buildinfo"
+            > "$SRC/rime-wugniu-suwu/build/buildinfo.txt"
           ls -la "$SRC/rime-wugniu-suwu/build"
 
       # 固定签名：secrets 与旧直装包同一把密钥体系，保证 release 产物已签名

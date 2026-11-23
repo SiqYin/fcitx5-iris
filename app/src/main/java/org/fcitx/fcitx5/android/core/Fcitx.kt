@@ -514,7 +514,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
      */
     private fun prepareRimePrebuiltDeployment() {
         val current = runCatching {
-            appContext.assets.open("usr/share/rime-data/build/.buildinfo")
+            appContext.assets.open("usr/share/rime-data/build/buildinfo.txt")
                 .bufferedReader().use { it.readText() }
         }.getOrNull() ?: return
         val extContext = FcitxApplication.getInstance().directBootAwareContext
