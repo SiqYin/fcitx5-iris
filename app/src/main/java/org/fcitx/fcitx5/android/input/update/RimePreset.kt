@@ -59,7 +59,8 @@ object RimePreset {
     ): Boolean {
         val buildinfo = runCatching {
             appContext.assets.open(BUILDINFO_ASSET).bufferedReader().use { it.readText() }
-        }.getOrNull() ?: run {
+        }.getOrNull()
+        if (buildinfo.isNullOrEmpty()) {
             Timber.w("RimePreset: no buildinfo in assets, skip preset")
             return false
         }
