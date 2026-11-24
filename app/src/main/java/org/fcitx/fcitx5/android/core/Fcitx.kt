@@ -19,6 +19,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.update.RimeAutoDeploy
+import org.fcitx.fcitx5.android.input.update.RimePreset
 import org.fcitx.fcitx5.android.utils.ImmutableGraph
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
@@ -483,6 +485,20 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
                 )
             }
             applyDefaultInputMethodGroup()
+            // 自动部署放在这里，而不是键盘 onStartInputView 里：
+            // deploy() 会 finalize 当前 Rime 引擎，如果此时键盘正在显示，用户会看到
+            // 「遇到了一个错误」。现在引擎刚启动、还没有输入视图挂着，是最安全的时机。
+            //
+            // 注意用 native 方法直接调（不经 withFcitxContext）：nativeStartup 本身就跑在
+            // dispatcher 线程上，再切一次 dispatcher 会自锁。
+            // 正常路径下预置已让 librime 判定「无改动」，stamp 相同即直接返回；
+            // 只有覆盖升级换了词库（或预置未生效）才真正跑一轮部署。
+            runCatching {
+                if (RimeAutoDeploy.shouldDeploy()) {
+                    setFcitxAddonSubConfig(RIME_ADDON, "deploy", RawConfig())
+                    RimeAutoDeploy.markDeployed()
+                }
+            }.onFailure { Timber.w(it, "auto deploy failed") }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 lifecycle.launchWhenReady {
                     SubtypeManager.syncWith(enabledIme())
@@ -527,65 +543,19 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     private var firstRun by AppPrefs.getInstance().internal.firstRun
 
     /**
-     * 免手动部署：APK 内自带 rime_deployer 预编译产物（usr/share/rime-data/build/）。
+     * 免手动部署：把 APK 内的预编译产物认领为「已部署」。
      *
-     * librime 启动时的修改检测（DetectModifications）只比较 shared/user 数据目录
-     * 顶层 *.yaml 的 mtime 与 user_data/user.yaml 里的 var/last_build_time；
-     * 预置产物 + 预写 user.yaml 即可让它一次编译都不发生，安装激活后开箱即用。
-     * 同时清掉手机端旧部署产物（user_data/build 优先于 prebuilt 加载，不清会遮蔽新词库）。
-     *
-     * 兜底：APK 内无产物 / 产物未同步落盘 / 用户放了自定义 yaml 时，
-     * 不做任何干预，让 Rime 走常规部署路径（与上游行为一致）。
+     * 具体逻辑在 [RimePreset]；这里只负责提供路径。
+     * **必须在 startupFcitx 之前调用**：此时还没有 Rime 引擎，不存在拆除引擎的风险。
      */
-    private fun prepareRimePrebuiltDeployment() {
-        val current = runCatching {
-            appContext.assets.open("usr/share/rime-data/build/buildinfo.txt")
-                .bufferedReader().use { it.readText() }
-        }.getOrNull() ?: return
+    private suspend fun prepareRimePrebuiltDeployment() {
         val extContext = FcitxApplication.getInstance().directBootAwareContext
         val extData = extContext.getExternalFilesDir(null) ?: extContext.filesDir
-        val rimeUserDir = File(extData, "data/rime")
-        val marker = File(rimeUserDir, ".iris_buildinfo")
-        if (marker.exists() && marker.readText() == current) return
-        val prebuiltDir = File(DataManager.dataDir, "usr/share/rime-data/build")
-        if (!prebuiltDir.isDirectory) {
-            Timber.w("Rime prebuilt dir missing after sync; fallback to normal deployment")
-            return
-        }
-        val hasCustom = rimeUserDir.listFiles { f -> f.isFile && f.name.endsWith(".yaml") }
-            ?.any { it.name != "user.yaml" && it.name != "installation.yaml" } ?: false
-        if (hasCustom) {
-            Timber.i("Rime custom yaml found; fallback to normal deployment")
-            return
-        }
-        rimeUserDir.mkdirs()
-        File(rimeUserDir, "build").deleteRecursively()
-        // last_build_time 必须取「当前时间」而不是「未来时间」：
-        // DetectModifications 的比较是 last_modified > last_build_time，写未来值虽然也能
-        // 压住首次自动部署，但之后用户点「部署」时 librime 仍认为 workspace 是最新的，
-        // 部署变成空操作（0.1.0 用户反馈「重新部署也没有任何效果」即由此而来）。
-        // 取当前时间即可：shared/user 顶层 yaml 的 mtime 都早于它 → 不触发自动部署；
-        // 用户手动部署走的是强制路径，不受此值影响。
-        val nowSeconds = System.currentTimeMillis() / 1000
-        File(rimeUserDir, "user.yaml").writeText(buildUserYaml(nowSeconds))
-        marker.writeText(current)
-        Timber.i("Rime prebuilt deployment refreshed: ${current.trim().lineSequence().firstOrNull()}")
-    }
-
-    /**
-     * 生成 user.yaml。
-     *
-     * 除 `var/last_build_time` 外还写入 `var/previously_selected_schema`：
-     * 两个发行版（吴语版 / 西安话版）内容完全一致，唯一区别就是这里的默认方案。
-     * librime 启动时按这个键恢复上次使用的方案，因此首次安装即落在各自方案上。
-     *
-     * 只在首次写入（user.yaml 不存在或被本方法覆盖）时生效：
-     * 用户之后自己切换方案，librime 会把新的选择写回同一文件。
-     */
-    private fun buildUserYaml(nowSeconds: Long): String = buildString {
-        append("var:\n")
-        append("  last_build_time: ").append(nowSeconds).append('\n')
-        append("  previously_selected_schema: ").append(BuildConfig.DEFAULT_SCHEME).append('\n')
+        RimePreset.prepare(
+            defaultScheme = BuildConfig.DEFAULT_SCHEME,
+            dataDir = DataManager.dataDir,
+            rimeUserDir = File(extData, "data/rime")
+        )
     }
 
     /**

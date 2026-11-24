@@ -63,7 +63,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.update.RimeAutoDeploy
 import org.fcitx.fcitx5.android.input.update.UpdateChecker
 import org.fcitx.fcitx5.android.input.update.UpdateNotifier
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
@@ -1105,22 +1104,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var keyboardShownHandled = false
 
     /**
-     * 键盘被调出时的后台动作：
+     * 键盘被调出时的后台动作。
      *
-     * 1. **自动部署**：首次安装/覆盖升级后，APK 里的词库还没落到用户目录，
-     *    Rime 会停在 maintenance 状态，必须手动点一次「部署」才能出字。
-     *    这里在第一次调出时自己跑一轮，用户零操作。
-     *    `RimeAutoDeploy` 内部按 buildinfo 摘要判定，已部署过就立即返回。
-     * 2. **更新检测**：查到更高版本时以**系统通知**提醒（带「更新」按钮），
-     *    不在键盘上弹窗，不打断输入。用户点过「稍后」后同一版本不再提示。
+     * 只做**更新检测**（发系统通知），绝不在前台触发 Rime 的部署：
+     * `deploy()` 内部是 `finalize() + rimeStart(true)`，会把正在使用的引擎拆掉再
+     * 无条件排 workspace_update，在手机上重编百万词表 —— 1.0.0 首次弹键盘
+     * 报「遇到了一个错误」并长时间卡死就是这条路径。
+     *
+     * 词库预置（免部署）在 `Fcitx.prepareRimePrebuiltDeployment()` 里完成，
+     * 时机是 fcitx 启动之前，写几个文件而已，不编译任何东西。
      */
     private suspend fun onKeyboardShown() {
         if (keyboardShownHandled) return
         keyboardShownHandled = true
-        // 先部署：这一步不依赖网络，且决定能不能打字，优先级高于更新提示
-        runCatching { fcitx.runOnReady { RimeAutoDeploy.ensureDeployed(this) } }
-            .onFailure { Timber.w(it, "auto deploy failed") }
-        // 再查更新：网络失败静默；查到就发通知
+        // 更新检测：网络失败静默；查到就发通知
         val update = runCatching { UpdateChecker.checkForUpdate() }.getOrNull() ?: return
         if (!UpdateNotifier.canNotify()) {
             Timber.d("onKeyboardShown: notifications not permitted, skip")

@@ -97,10 +97,15 @@ jobs:
           cp rime-essay/essay.txt "$STAGE/"
           cp rime-wugniu-suwu/*.yaml "$STAGE/"
           # 上游搜狗表是纯汉字词条（无拼音列），独立编译时无法走 CreateEntry：
-          # 用 pypinyin 生成 luna_pinyin 风格码列（无声调、v 代 ü），
-          # 仅生成到 staging，仓库内保持上游原样
+          # 用 pypinyin 生成 luna_pinyin 风格码列（无声调、v 代 ü）
           pip install --quiet pypinyin
           python3 "$GITHUB_WORKSPACE/scripts/gen_sogou_codes.py" "$STAGE/luna_pinyin.sogou.dict.yaml"
+          # 关键：把补码后的搜狗表也交给 CMake 安装进 APK。
+          # 预编译产物 table.bin 里的 dict_file_checksum 是按补码后的文件算的；
+          # 若 APK 里装的是仓库原文件（无码列），设备端 checksum 对不上，
+          # DictCompiler 会在手机上把 104 万条从头编一遍（几十分钟，1.0.0 的卡死即此）。
+          mkdir -p "$SRC/rime-wugniu-suwu/build-src"
+          cp "$STAGE/luna_pinyin.sogou.dict.yaml" "$SRC/rime-wugniu-suwu/build-src/"
           cp rime-xinganhua/*.yaml "$STAGE/"
           cp -r rime-wugniu-suwu/lua "$STAGE/lua"
           # 先单独 verbose 编译共享搜狗词库（依赖/错误细节都打出来；

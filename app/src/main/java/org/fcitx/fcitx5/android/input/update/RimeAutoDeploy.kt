@@ -4,79 +4,73 @@
  */
 package org.fcitx.fcitx5.android.input.update
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.security.MessageDigest
 
 /**
- * 首次调出输入法时自动部署。
+ * Rime 部署的「是否需要执行」判定与标记。
  *
- * 为什么需要它：APK 里带着在构建机上预编译好的 rime 产物，正常路径下
- * `Fcitx.prepareRimePrebuiltDeployment()` 已经让 librime 判定「无修改」，
- * 一次编译都不发生。但只要下面任一情况出现，Rime 就会停在
- * maintenance（部署中）状态、键盘出字前必须先点一次「部署」：
+ * ## 为什么要自动部署
  *
- *  - 用户第一次在系统设置里勾选本输入法（覆盖安装后 user_data 是全新的）；
- *  - 用户放过自定义 yaml，走的是常规部署路径；
- *  - 覆盖升级换了词库（buildinfo.txt 变了）。
+ * APK 里带着预编译产物，正常情况下 librime 的 detect_modifications 会判定「无改动」，
+ * 一次编译都不发生。但只要预置没能生效（首次安装的时序、用户改过 yaml、
+ * 覆盖升级换了词库），Rime 就会停在 maintenance 状态 —— 键盘弹出却打不了字，
+ * 必须用户自己去菜单里点一次「部署」。这一步本类负责替用户做掉。
  *
- * 这里在**键盘第一次被调出**时判断一次「当前 APK 的 buildinfo 是否已部署过」，
- * 没部署过就自己触发一轮，用户不需要点任何东西。
+ * ## 为什么必然是秒级
  *
- * 判据用 [AppPrefs.Internal.rimeDeployedStamp]（上一次成功自动部署时的 buildinfo 摘要）
- * 而不是每次启动都跑：部署本身要一两秒，不能每次弹键盘都做。
+ * deploy() → rimeStart(true) → workspace_update → 每个 schema 走 SchemaUpdate
+ * → DictCompiler::Compile()。后者先算源 `*.dict.yaml` 的 dict_file_checksum，
+ * 与 `table.bin` 里记录的值比对：**一致就 reuse existing table，不重建**；
+ * prism / reverse 同理。所以只要 APK 里同时有产物和与之匹配的源文件，
+ * 这一轮就是「比对 checksum + 加载」，一秒内结束。
+ *
+ * （1.0.0 之所以在设备上从头编 104 万条：APK 装的搜狗表是上游原文件、无拼音码列，
+ *   而产物是按 CI 补码后的文件编的 → checksum 永远不一致。已由 CMakeLists
+ *   安装 `rime-wugniu-suwu/build-src/` 下的补码版本修正。）
+ *
+ * ## 调用时机
+ *
+ * 只在 **fcitx 启动完成、还没有输入视图挂着** 时调用（`Fcitx.nativeStartup` 末尾）。
+ * deploy() 内部会 finalize 引擎，若在键盘显示期间执行，用户会看到「遇到了一个错误」。
  */
 object RimeAutoDeploy {
 
-    /** buildinfo.txt 在 assets 里的路径（与 Fcitx.prepareRimePrebuiltDeployment 一致） */
     private const val BUILDINFO_ASSET = "usr/share/rime-data/build/buildinfo.txt"
 
-    /**
-     * 若本 APK 的词库还没部署过，就跑一轮部署。
-     *
-     * 需要在 fcitx 已就绪后调用（键盘调出时必然已就绪）。
-     *
-     * @return true 表示这次真的执行了部署。
-     */
-    suspend fun ensureDeployed(fcitx: FcitxAPI): Boolean = withContext(Dispatchers.IO) {
-        val stamp = runCatching { currentStamp() }.getOrNull()
-        if (stamp.isNullOrEmpty()) {
-            // APK 内没有预编译产物（本地直接构建），交给 Rime 的常规部署路径
-            Timber.d("RimeAutoDeploy: no buildinfo in APK, skip")
-            return@withContext false
-        }
-        val prefs = AppPrefs.getInstance().internal
-        if (prefs.rimeDeployedStamp.getValue() == stamp) {
-            Timber.d("RimeAutoDeploy: already deployed for $stamp")
-            return@withContext false
-        }
-        Timber.i("RimeAutoDeploy: deploying for $stamp")
-        runCatching { fcitx.deployRime() }
-            .onSuccess {
-                prefs.rimeDeployedStamp.setValue(stamp)
-                Timber.i("RimeAutoDeploy: done")
-            }
-            .onFailure {
-                // 失败就不记标记，下次调出再试
-                Timber.w(it, "RimeAutoDeploy: deploy failed")
-            }
-        prefs.rimeDeployedStamp.getValue() == stamp
-    }
+    /** 本次启动已经算过的 stamp，避免同一进程内重复判定 */
+    @Volatile
+    private var pendingStamp: String? = null
 
     /**
-     * 当前 APK 内 buildinfo.txt 的摘要。
+     * 当前 APK 的词库是否需要（重新）部署。
      *
-     * buildinfo.txt 里含 schema 哈希、librime 版本与构建时间戳，
-     * 覆盖升级换词库时必然变化，正好当版本戳用。
+     * 预置成功时 [RimePreset] 已经把 stamp 写好了，这里会返回 false —— 也就是说
+     * 正常安装/升级根本不会走到 deploy()，键盘一弹出就能打字。
+     * 只有预置没能生效（用户改过 yaml、产物缺失等）才会真正跑一轮部署兜底。
      */
+    fun shouldDeploy(): Boolean {
+        val stamp = runCatching { currentStamp() }.getOrNull() ?: return false
+        if (stamp.isEmpty()) return false
+        pendingStamp = stamp
+        val done = AppPrefs.getInstance().internal.rimeDeployedStamp.getValue() == stamp
+        if (!done) Timber.i("RimeAutoDeploy: preset did not apply, will deploy for $stamp")
+        return !done
+    }
+
+    /** 部署成功后记录 stamp，同一份词库下次启动不再重复 */
+    fun markDeployed() {
+        val stamp = pendingStamp ?: return
+        AppPrefs.getInstance().internal.rimeDeployedStamp.setValue(stamp)
+        pendingStamp = null
+        Timber.i("RimeAutoDeploy: marked deployed for $stamp")
+    }
+
     private fun currentStamp(): String {
-        val text = appContext.assets.open(BUILDINFO_ASSET)
-            .bufferedReader().use { it.readText() }
-        val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }.take(16)
+        val text = appContext.assets.open(BUILDINFO_ASSET).bufferedReader().use { it.readText() }
+        val d = MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
+        return d.joinToString("") { "%02x".format(it) }.take(16)
     }
 }

@@ -58,6 +58,22 @@ install(FILES
         )
 
 # wugniu_suwu (吴语混合腔) scheme files
+#
+# luna_pinyin.sogou.dict.yaml 有一个关键点：CI 在编译前用 scripts/gen_sogou_codes.py
+# 给它补过拼音码列（上游是纯汉字词表，独立编译时无法走 CreateEntry）。
+# 预编译产物 luna_pinyin.sogou.table.bin 里的 dict_file_checksum 是**按补码后的文件**算的。
+# 如果 APK 里装的还是仓库原文件（无码列），设备端一算 checksum 就对不上，
+# DictCompiler 会判定需要重建，然后在手机上把 104 万条从头编一遍——几十分钟。
+# 所以这里优先安装 CI 生成的那份（rime-wugniu-suwu/build-src/），没有才回落到仓库原文件。
+set(SOGOU_DICT_SRC "rime-wugniu-suwu/luna_pinyin.sogou.dict.yaml")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rime-wugniu-suwu/build-src/luna_pinyin.sogou.dict.yaml")
+    set(SOGOU_DICT_SRC "rime-wugniu-suwu/build-src/luna_pinyin.sogou.dict.yaml")
+    message(STATUS "Using pinyin-coded sogou dict from build-src/")
+else ()
+    message(WARNING "Pinyin-coded sogou dict not found in build-src/; "
+            "shipping the raw upstream dict will force on-device recompilation")
+endif ()
+
 install(FILES
         "rime-wugniu-suwu/wugniu_suwu.schema.yaml"
         "rime-wugniu-suwu/wugniu_suwu.dict.yaml"
@@ -67,7 +83,7 @@ install(FILES
         "rime-wugniu-suwu/wuphin.map.dict.yaml"
         "rime-wugniu-suwu/wuphin.phrases.dict.yaml"
         "rime-wugniu-suwu/sougouciku.dict.yaml"
-        "rime-wugniu-suwu/luna_pinyin.sogou.dict.yaml"
+        "${SOGOU_DICT_SRC}"
         "rime-wugniu-suwu/luna_pinyin.sogou.schema.yaml"
         "rime-wugniu-suwu/symbols_wu.yaml"
         "rime-wugniu-suwu/wugniuji.ico"
