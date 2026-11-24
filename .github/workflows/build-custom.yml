@@ -70,9 +70,11 @@ jobs:
           cp rime-stroke/stroke.dict.yaml rime-stroke/stroke.schema.yaml "$STAGE/"
           cp rime-essay/essay.txt "$STAGE/"
           cp rime-wugniu-suwu/*.yaml "$STAGE/"
-          # 实证：查看 runner 上搜狗表的真实字节（BOM/行尾/分隔符）
-          head -c 200 "$STAGE/luna_pinyin.sogou.dict.yaml" | od -c | head -12
-          wc -l "$STAGE/luna_pinyin.sogou.dict.yaml"
+          # 上游搜狗表是纯汉字词条（无拼音列），独立编译时无法走 CreateEntry：
+          # 用 pypinyin 生成 luna_pinyin 风格码列（无声调、v 代 ü），
+          # 仅生成到 staging，仓库内保持上游原样
+          pip install --quiet pypinyin
+          python3 "$GITHUB_WORKSPACE/scripts/gen_sogou_codes.py" "$STAGE/luna_pinyin.sogou.dict.yaml"
           cp rime-xinganhua/*.yaml "$STAGE/"
           cp -r rime-wugniu-suwu/lua "$STAGE/lua"
           # 先单独 verbose 编译共享搜狗词库（依赖/错误细节都打出来；
