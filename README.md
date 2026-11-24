@@ -2,8 +2,6 @@
 
 ![Image 1: Iris Keyboard](https://raw.githubusercontent.com/SiqYin/fcitx5-iris/main/brand/readme-hero-circle.png)
 
-> 临时 logo：取自 [BewlyIris](https://github.com/SiqYin/BewlyIris) 的鸢尾花品牌图案，后续会替换为小鸢输入法自己的正式 logo。
-
 **小鸢输入法**（Iris Keyboard）是 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)（小企鹅输入法）的独立发行版：把 Rime 输入引擎与四套方言方案直接打进**一个 APK**，词库在构建机上预编译好随包分发，安装激活后**开箱即用**——不再需要装插件 APK，也不再需要手动「部署」。
 
 ## 内置方案
@@ -14,6 +12,8 @@
 | 吴语拼音文 | `wugniu_lumozy` | 汉字 ⇄ 拼音文互换（复用 `wugniu_suwu` 词典） |
 | 西安话·城区音 | `chengqyu` | `q` 普通话拼音反查、`x` 笔画反查 |
 | 西安话·南郊音 | `nanjiao` | 与城区音并行，南郊音体系 |
+
+输入法只有两个：**Rime（中州韵）** 与 **English**，其中 Rime 是默认输入法。方案菜单在键盘上按 `Ctrl+`` 或 F4 切换。
 
 方案来源：
 
@@ -31,12 +31,15 @@
 
 本仓库整合了 [SiqYin/fcitx5-wugniu](https://github.com/SiqYin/fcitx5-wugniu)（吴语）与 [SiqYin/android-xinganhua](https://github.com/SiqYin/android-xinganhua)（西安话）两个直装包的输入方案。包名不同（`io.github.siqyin.iris`），可与旧包并存安装。
 
+两个直装包仍在正常更新，本仓库只是把它的方案与词库同步进来打包；方案内容的维护仍以两个方案库为准。
+
 ## 开箱即用的原理
 
-- 构建时（CI）在 Ubuntu 上用与安卓包**同版本的 librime**（1.12.0）编译 `rime_deployer`，跑 `--build` 把 4 个方案与全部词典编译成 `table/prism/reverse` 产物，连同 `.buildinfo` 版本戳打进 APK 的 `assets/usr/share/rime-data/build/`；
+- 构建时（CI）在 Ubuntu 上用与安卓包**同版本的 librime**（1.16.1，取自 `lib/fcitx5/src/main/cpp/prebuilt` 子模块）编译 `rime_deployer`，跑 `--build` 把 4 个方案与全部词典编译成 `table/prism/reverse` 产物，连同 `buildinfo.txt` 版本戳打进 APK 的 `assets/usr/share/rime-data/build/`；
 - 该目录正是 librime 的 `prebuilt_data_dir`（`shared_data_dir/build`），运行时加载「已部署资源」的顺序是：手机端 `user_data/build`（无则跳过）→ APK 预置产物；
-- 应用首次启动时（`Fcitx.prepareRimePrebuiltDeployment`）对比 `.buildinfo` 版本：变化则清理手机端旧部署产物并预写 `user.yaml`（`var/last_build_time`），使 librime 的修改检测（`DetectModifications`）直接判定「无修改」，**一次编译都不发生**；
+- 应用首次启动时（`Fcitx.prepareRimePrebuiltDeployment`）对比 `.iris_buildinfo` 版本：变化则清理手机端旧部署产物并预写 `user.yaml`（`var/last_build_time`），使 librime 的修改检测（`DetectModifications`）直接判定「无修改」，**一次编译都不发生**；
 - 词库更新只受 APK 体积约束——在手机上编译大词表导致内存超限的问题从根上消失。
+- **预编译用的 librime 版本必须与 prebuilt 子模块一致**：产物二进制格式随版本变化（1.12 写 `Rime::Prism/3.0`，1.16 要求 `>= 4.0` 并拒绝 3.0）。版本不一致时所有方案 prism 加载失败，表现为「完全打不了字」。
 
 兜底：APK 内无预编译产物（本地直接构建）、用户在 Rime 用户目录放了自定义 yaml 时，应用不干预，Rime 走常规部署路径；键盘方案菜单里的「部署」入口保留。
 

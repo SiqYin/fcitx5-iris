@@ -208,6 +208,12 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
     private companion object JNI {
 
+        /** Rime 引擎的输入法唯一名（inputmethod/rime.conf 的 Addon=rime + key） */
+        private const val PREBUILT_CHINESE_ENGINE = "rime"
+
+        /** 英文键盘的唯一名（androidkeyboard 的 listInputMethods() 固定值） */
+        private const val FALLBACK_LATIN_ENGINE = "keyboard-us"
+
         /**
          * called from native-lib
          */
@@ -305,6 +311,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
         @JvmStatic
         external fun setEnabledInputMethods(array: Array<String>)
+
+        @JvmStatic
+        external fun ensureInputMethodGroup(preferred: Array<String>, defaultIme: String): Boolean
 
         @JvmStatic
         external fun getFcitxGlobalConfig(): RawConfig?
@@ -458,6 +467,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
                     extDomains.toTypedArray()
                 )
             }
+            applyDefaultInputMethodGroup()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 lifecycle.launchWhenReady {
                     SubtypeManager.syncWith(enabledIme())
@@ -535,11 +545,43 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         }
         rimeUserDir.mkdirs()
         File(rimeUserDir, "build").deleteRecursively()
-        val future = System.currentTimeMillis() / 1000 + 60
-        File(rimeUserDir, "user.yaml").writeText("var:\n  last_build_time: $future\n")
+        // last_build_time 必须取「当前时间」而不是「未来时间」：
+        // DetectModifications 的比较是 last_modified > last_build_time，写未来值虽然也能
+        // 压住首次自动部署，但之后用户点「部署」时 librime 仍认为 workspace 是最新的，
+        // 部署变成空操作（0.1.0 用户反馈「重新部署也没有任何效果」即由此而来）。
+        // 取当前时间即可：shared/user 顶层 yaml 的 mtime 都早于它 → 不触发自动部署；
+        // 用户手动部署走的是强制路径，不受此值影响。
+        val nowSeconds = System.currentTimeMillis() / 1000
+        File(rimeUserDir, "user.yaml").writeText("var:\n  last_build_time: $nowSeconds\n")
         marker.writeText(current)
         Timber.i("Rime prebuilt deployment refreshed: ${current.trim().lineSequence().firstOrNull()}")
     }
+
+    /**
+     * 默认输入法：Rime（keyboard-us 英文键盘保留为用户可选，但不是默认）。
+     *
+     * 首次启动时 fcitx5 会按 FocusGroup 的 XKB 布局 buildDefaultGroup()，
+     * 组内第一项固定是 keyboard-<layout>（安卓上无 X11，回落成 keyboard-us），
+     * 于是默认输入法变成英文键盘、Rime 根本不在组里——用户必须手动添加才能用。
+     * 这里在 startup 之后把组补齐成 [rime, keyboard-us] 并把 DefaultIM 设为 rime。
+     *
+     * 幂等：已符合预期时不写 profile；用户后续自行增删输入法不会被覆盖
+     * （只有组内缺少 rime 或 DefaultIM 不是 rime 时才修正）。
+     */
+    private fun applyDefaultInputMethodGroup() {
+        if (PREBUILT_CHINESE_ENGINE !in availableEngines()) return
+        val changed = ensureInputMethodGroup(
+            arrayOf(PREBUILT_CHINESE_ENGINE, FALLBACK_LATIN_ENGINE),
+            PREBUILT_CHINESE_ENGINE
+        )
+        if (changed) {
+            Timber.i("Default input method group updated: $PREBUILT_CHINESE_ENGINE first")
+        }
+    }
+
+    private fun availableEngines(): Set<String> =
+        runCatching { availableInputMethods()?.map { it.uniqueName }?.toSet() ?: emptySet() }
+            .getOrElse { emptySet() }
 
     private fun handleFirstRunReadyEvent(event: FcitxEvent<*>) {
         if (event is FcitxEvent.ReadyEvent && firstRun) {

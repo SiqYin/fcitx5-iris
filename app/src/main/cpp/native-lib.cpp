@@ -187,6 +187,62 @@ public:
         imMgr.save();
     }
 
+    // 保证默认输入法组（第一个组）里存在 preferred 指定的输入法，并且
+    // 默认输入法为 defaultIM。语义是「补齐 + 定默认」，不是「覆盖用户配置」：
+    //  - 组里已包含 defaultIM：只调整 DefaultIM 字段，保留用户自己的条目顺序与增删；
+    //  - 组里缺少任何一个 preferred：按 preferred 顺序重建该组（用户的额外条目追加在后）。
+    // 返回 true 表示写了 profile。
+    bool ensureInputMethodGroup(const std::vector<std::string> &preferred,
+                                const std::string &defaultIM) {
+        auto &imMgr = p_instance->inputMethodManager();
+        auto &current = imMgr.currentGroup();
+        const auto &items = current.inputMethodList();
+
+        bool allPresent = true;
+        for (const auto &p: preferred) {
+            if (!imMgr.entry(p)) continue;  // 该输入法本机不存在，跳过
+            bool found = false;
+            for (const auto &item: items) {
+                if (item.name() == p) { found = true; break; }
+            }
+            if (!found) { allPresent = false; break; }
+        }
+
+        if (allPresent) {
+            if (current.defaultInputMethod() == defaultIM) {
+                return false;
+            }
+            imMgr.setDefaultInputMethod(defaultIM);
+            imMgr.save();
+            return true;
+        }
+
+        fcitx::InputMethodGroup newGroup(current.name());
+        newGroup.setDefaultLayout(current.defaultLayout().empty()
+                                      ? "us"
+                                      : current.defaultLayout());
+        auto &list = newGroup.inputMethodList();
+        for (const auto &p: preferred) {
+            if (imMgr.entry(p)) {
+                list.emplace_back(p);
+            }
+        }
+        // 保留用户已启用的其它输入法（排在后面，不丢失）
+        for (const auto &item: items) {
+            bool dup = false;
+            for (const auto &added: list) {
+                if (added.name() == item.name()) { dup = true; break; }
+            }
+            if (!dup) {
+                list.emplace_back(item.name());
+            }
+        }
+        newGroup.setDefaultInputMethod(defaultIM);
+        imMgr.setGroup(std::move(newGroup));
+        imMgr.save();
+        return true;
+    }
+
     static fcitx::RawConfig mergeConfigDesc(const fcitx::Configuration &conf) {
         fcitx::RawConfig topLevel;
         auto cfg = topLevel.get("cfg", true);
@@ -880,6 +936,21 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_setEnabledInputMethods(JNIEnv *env, jcl
         entries.emplace_back(CString(env, string));
     }
     Fcitx::Instance().setEnabledInputMethods(entries);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_org_fcitx_fcitx5_android_core_Fcitx_ensureInputMethodGroup(JNIEnv *env, jclass clazz, jobjectArray array, jstring defaultIme) {
+    RETURN_VALUE_IF_NOT_RUNNING(false)
+    int size = env->GetArrayLength(array);
+    std::vector<std::string> preferred;
+    for (int i = 0; i < size; i++) {
+        auto string = JRef<jstring>(env, env->GetObjectArrayElement(array, i));
+        preferred.emplace_back(CString(env, string));
+    }
+    return Fcitx::Instance().ensureInputMethodGroup(preferred, CString(env, defaultIme))
+               ? JNI_TRUE
+               : JNI_FALSE;
 }
 
 extern "C"

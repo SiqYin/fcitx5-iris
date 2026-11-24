@@ -67,10 +67,29 @@ fcitxComponent {
         "libime",
         "fcitx5-chinese-addons"
     )
-    // exclude (delete immediately after install) tables that nobody would use
-    excludeFiles = listOf("cangjie", "erbi", "qxm", "wanfeng", "pinyin", "shuangpin", "table").map {
+    // 本发版只保留两个输入法：Rime（默认）与 English（androidkeyboard 动态提供）。
+    // 以下全部不进包：
+    //  1) 码表类 addon 的 conf：cangjie/erbi/qxm/wanfeng/pinyin/shuangpin/table
+    //  2) 具体码表方案：zrm 自然码、wbx 五笔字型、wbpy 五笔拼音、db 电报码
+    //  3) 上述方案各自的 .main.dict（usr/share/fcitx5/table/，合计 ~8 MB 压缩）
+    //  4) libime 语言模型与词库（usr/share/libime/，~34 MB 压缩）：
+    //     zh_CN.lm 只有拼音 addon 使用，而 pinyin.conf 已在上面排除，属纯死重。
+    //     比对：Rime 走自己的 librime + rime-data，完全不经 libime。
+    excludeFiles = listOf(
+        "cangjie", "erbi", "qxm", "wanfeng", "pinyin", "shuangpin", "table",
+        "zrm", "wbx", "wbpy", "db"
+    ).map {
         "usr/share/fcitx5/inputmethod/$it.conf"
-    }
+    } + listOf(
+        "usr/share/fcitx5/table/zrm.main.dict",
+        "usr/share/fcitx5/table/wbx.main.dict",
+        "usr/share/fcitx5/table/wbpy.main.dict",
+        "usr/share/fcitx5/table/db.main.dict",
+        "usr/share/libime/extb.dict",
+        "usr/share/libime/sc.dict",
+        "usr/share/libime/zh_CN.lm",
+        "usr/share/libime/zh_CN.lm.predict"
+    )
     installPrebuiltAssets = true
 }
 

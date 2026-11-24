@@ -55,7 +55,6 @@ engine:
     - fallback_segmentor
   translators:
     - punct_translator
-    - script_translator
     - script_translator              # 主翻譯器
     - script_translator@sogou    # 共享搜狗詞庫
     - reverse_lookup_translator

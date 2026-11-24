@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install extra-cmake-modules gettext \
-            libboost-dev libboost-iostreams-dev libboost-system-dev \
+            libboost-dev libboost-regex-dev libboost-iostreams-dev libboost-system-dev \
             libgoogle-glog-dev libleveldb-dev libmarisa-dev libopencc-dev libyaml-cpp-dev
 
       # 预编译 Rime 词库：在构建机上（对齐 prebuilt 子模块的 librime 1.12.0）
@@ -47,7 +47,12 @@ jobs:
           GLOG_colorlogtostderr: "1"
         run: |
           set -euo pipefail
-          LIBRIME_VER=1.12.0
+          # 必须与 lib/fcitx5/src/main/cpp/prebuilt 子模块里的 librime 完全同版本。
+          # 预编译产物（table/prism/reverse 二进制）的格式随 librime 版本变化：
+          #   1.12.x 写 Prism/3.0；1.16.x 要求 Prism >= 4.0，读到 3.0 直接判
+          #   "too old" 并拒绝加载 → 运行时 dict->loaded() 恒为 false → 任何键都不出字。
+          # prebuilt（fcitx5-android/prebuilt，commit 3f987c6）打包的是 1.16.1。
+          LIBRIME_VER=1.16.1
           cd "$RUNNER_TEMP"
           curl -sSfL -o librime.tar.gz "https://github.com/rime/librime/archive/refs/tags/${LIBRIME_VER}.tar.gz"
           tar xzf librime.tar.gz

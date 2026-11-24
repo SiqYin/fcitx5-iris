@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 临时 logo：WuyuqIris 鸢尾纹章（白，取自 BewlyIris brand/wuyuqiris-mark.svg） -->
+<!-- 小鸢输入法 logo：鸢尾纹章（白）。源文件 brand/wuyuqiris-mark.svg（851x1029）。
+     adaptive icon 的 108dp viewport 只有中央 72dp 可见，故纹章高取 46dp 居中。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:translateX="26.77"
-        android:translateY="21.07"
-        android:scaleX="0.064"
-        android:scaleY="0.064">
+        android:translateX="34.95"
+        android:translateY="30.96"
+        android:scaleX="0.04483"
+        android:scaleY="0.04483">
         <path
             android:fillColor="#FFFFFF"
             android:fillType="evenOdd"
