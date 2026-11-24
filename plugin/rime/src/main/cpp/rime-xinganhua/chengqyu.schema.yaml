@@ -4,7 +4,7 @@
 schema:
   schema_id: chengqyu
   name: 西安話城區音
-  version: "1.1.7"
+  version: "1.1.8"
   author:
     - 雪螢 SiqYin <siqyin@qq.com>（方案、詞庫轉換）
     - 字音來源：osfans/MCPDict《西安》數據表（國際音標）
@@ -15,10 +15,9 @@ schema:
     同倉庫另有西安話南郊音方案 nanjiao（聲母 25——rh 為南郊音獨有、韻母 38），兩套並行。
     拼寫以全拼為準，簡拼只在輸入端兼容（注音、詞庫仍寫全拼）；聲調不輸入，故輸入碼不含數字。
     詞庫字頭為繁體（同 Rime 社區慣例），默認按繁→簡表輸出簡體；切到「繁體」才原樣輸出。
-    反查：Q 起頭用普通話拼音，X 起頭用筆畫。
+    反查：`（反引號）起頭用普通話拼音，末綴 ; 可省；西安話拼音本身要用 q、x，故不再拿 Q、X 做反查前綴。
   dependencies:
     - luna_pinyin
-    - stroke
     - luna_pinyin.sogou
 
 switches:
@@ -48,7 +47,6 @@ engine:
     - ascii_segmentor
     - matcher
     - affix_segmentor@luna_pinyin
-    - affix_segmentor@stroke
     - abc_segmentor
     - punct_segmentor
     - fallback_segmentor
@@ -58,7 +56,6 @@ engine:
     - script_translator@sogou    # 共享搜狗詞庫
     - reverse_lookup_translator
     - script_translator@luna_pinyin
-    - table_translator@stroke
   filters:
     - simplifier
     - uniquifier
@@ -96,6 +93,16 @@ speller:
     # ── 聲母簡打（等詞庫做齊再開，避免單字層面同音爆掉）──
     # - abbrev/^([a-z]).+$/$1/
     # - abbrev/^(zh|ch|sh|bf|pf|ng).+$/$1/
+# 共享搜狗詞庫：全量表獨立編譯一份（見 luna_pinyin.sogou.schema.yaml），
+# 四個方案个 script_translator@sogou 共用同一份 table/prism，弗再各自 import。
+# 注意：本塊必須在 schema 頂層 —— ScriptTranslator 的 Memory 用
+# ticket.name_space + "/dictionary" 取配置（name_space = "sogou"），
+# 嵌在 grammar: 下面時讀不到，translator 會因 dictionary not specified 直接禁用。
+sogou:
+  tag: abc
+  dictionary: luna_pinyin.sogou
+  prism: luna_pinyin.sogou
+  initial_quality: 1
 
 # 主翻譯器
 translator:
@@ -107,36 +114,29 @@ translator:
   # comment_format:
   #   - xform/\d//
 
-  # 共享搜狗詞庫：全量表獨立編譯一份（見 luna_pinyin.sogou.schema.yaml），
-  # 四個方案个 script_translator@sogou 共用同一份 table/prism，弗再各自 import。
-  sogou:
-    tag: abc
-    dictionary: luna_pinyin.sogou
-    prism: luna_pinyin.sogou
-    initial_quality: 1
-# 副翻譯器 1：普通話拼音反查
+# 副翻譯器：普通話拼音反查
+# 前綴用反引號 `，寫法同 rime-cantonese 的 jyut6ping3（prefix: "`"，suffix: ";"）。
+# 不能像吳語方案那樣用 Q：西安話拼音本身就有 qi qia qian qiang qiao qie qien qieng qiou qyu…
+# 若 Q 被佔作反查前綴，這些音節打頭就會被切成反查段，屬實打不出字。
+# 完整清單（城區音 15 個）：qi qia qian qiang qiao qie qien qieng qiou qyu qyuan qyue qyuen qyuo qyuong
 luna_pinyin:
   tag: luna_pinyin
   dictionary: luna_pinyin
-  prefix: "q"
+  prefix: "`"
+  suffix: ";"
   tips: 〔普通話〕
   preedit_format:
     - xform/([nl])v/$1ü/
     - xform/([nl])ue/$1üe/
     - xform/([jqxy])v/$1u/
 
-# 副翻譯器 2：筆畫反查
-stroke:
-  tag: stroke
-  dictionary: stroke
-  prefix: "x"
-  tips: 〔筆畫〕
-  preedit_format:
-    - xlit/hspnz/一丨丿丶乙/
+# 筆畫反查（原 X 起頭）已撤除：
+# X 是西安話拼音的正式聲母（xi xia xian xiang xiao xie xien xieng xiou xyu xyuan xyue xyuen xyuo xyuong），
+# 不能拿去做反查前綴；本方案也不再依賴 stroke 詞典與 table_translator@stroke。
 
 # 反查濾鏡：反查結果顯示西安話城區音拼音
 chengqyu_reverse_lookup:
-  tags: [luna_pinyin, stroke]
+  tags: [luna_pinyin]
   overwrite_comment: true
   dictionary: chengqyu
   comment_format:
@@ -151,5 +151,4 @@ key_binder:
 recognizer:
   import_preset: default
   patterns:
-    luna_pinyin: "^q[a-z']*$"
-    stroke: "^x[hspnz]*$"
+    luna_pinyin: "^`[a-z']*;?$"
