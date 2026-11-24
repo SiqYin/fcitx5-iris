@@ -548,7 +548,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
      * 具体逻辑在 [RimePreset]；这里只负责提供路径。
      * **必须在 startupFcitx 之前调用**：此时还没有 Rime 引擎，不存在拆除引擎的风险。
      */
-    private suspend fun prepareRimePrebuiltDeployment() {
+    private fun prepareRimePrebuiltDeployment() {
         val extContext = FcitxApplication.getInstance().directBootAwareContext
         val extData = extContext.getExternalFilesDir(null) ?: extContext.filesDir
         RimePreset.prepare(
