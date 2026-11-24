@@ -122,7 +122,7 @@ object RimePreset {
         // 再主动跑一轮 deploy()（那会 finalize 引擎并排 workspace_update）。
         AppPrefs.getInstance().internal.rimeDeployedStamp.setValue(stamp)
         Timber.i("RimePreset: prepared (buildinfo=$stamp, scheme=$defaultScheme)")
-        true
+        return true
     }
 
     private fun markerContent(stamp: String, scheme: String) = "$stamp/$scheme"
