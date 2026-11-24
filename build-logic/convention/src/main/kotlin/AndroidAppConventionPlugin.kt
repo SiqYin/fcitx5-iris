@@ -118,10 +118,19 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                 val variantName = v.name.capitalized()
                 // Evaluation should be delayed as we need be able to see other tasks
                 target.afterEvaluate {
-                    tasks.findByName(DataDescriptorPlugin.TASK)?.also {
-                        tasks.findByName("merge${variantName}Assets")?.dependsOn(it)
-                        tasks.findByName("lintVitalAnalyzeRelease")?.dependsOn(it)
-                        tasks.findByName("generateReleaseLintVitalReportModel")?.dependsOn(it)
+                    tasks.findByName(DataDescriptorPlugin.TASK)?.also { dataDescriptorTask ->
+                        // merge<Variant>Assets 一直是变体相关的
+                        tasks.findByName("merge${variantName}Assets")?.dependsOn(dataDescriptorTask)
+                        // lintVital 任务名也是变体相关的（如 lintVitalAnalyzeWugniuRelease /
+                        // generateWugniuReleaseLintVitalReportModel）。这里不能写死 "Release"：
+                        // 一旦引入 productFlavors，变体名就变成 <Flavor><BuildType>，
+                        // 硬编码名找不到任务，而导致 generateDataDescriptor 的产出被 lint 任务
+                        // 隐式依赖（Gradle 会直接判构建失败）。
+                        tasks.matching { t ->
+                            t.name.contains(variantName) &&
+                                    (t.name.startsWith("lintVitalAnalyze") ||
+                                            t.name.startsWith("generate") && t.name.endsWith("LintVitalReportModel"))
+                        }.configureEach { dependsOn(dataDescriptorTask) }
                     }
                 }
             }
