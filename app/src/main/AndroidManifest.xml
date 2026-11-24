@@ -13,6 +13,8 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 更新检测：调出输入法时向 GitHub API 查一次最新 Release（失败则静默） -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- remove intent queries merged from library manifest (namely Android-Image-Cropper) -->
     <queries tools:node="removeAll" />

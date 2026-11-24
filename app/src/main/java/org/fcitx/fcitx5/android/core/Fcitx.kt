@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import android.content.Context
 import android.os.Build
+import org.fcitx.fcitx5.android.BuildConfig
 import androidx.annotation.Keep
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.BufferOverflow
@@ -197,6 +198,17 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun triggerCandidateListTabAction(id: Int) =
         withFcitxContext { triggerFcitxCandidateListTabAction(id) }
 
+    /**
+     * 触发 Rime 的一轮部署（等价于用户点「部署」）。
+     *
+     * fcitx5-rime 的 RimeEngine::setSubConfig 把 path == "deploy" 映射到 deploy()，
+     * 后者 finalize + rimeStart(true)，即全量强制部署（kRebuild）。
+     * 走 [withFcitxContext] 保证在 fcitx 线程执行，不阻塞 UI。
+     */
+    override suspend fun deployRime() = withFcitxContext {
+        setFcitxAddonSubConfig(RIME_ADDON, "deploy", RawConfig())
+    }
+
     init {
         if (lifecycle.currentState != FcitxLifecycle.State.STOPPED)
             throw IllegalAccessException("Fcitx5 has already been created!")
@@ -210,6 +222,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
         /** Rime 引擎的输入法唯一名（inputmethod/rime.conf 的 Addon=rime + key） */
         private const val PREBUILT_CHINESE_ENGINE = "rime"
+
+        /** Rime addon 的唯一名（addon/rime.conf） */
+        private const val RIME_ADDON = "rime"
 
         /** 英文键盘的唯一名（androidkeyboard 的 listInputMethods() 固定值） */
         private const val FALLBACK_LATIN_ENGINE = "keyboard-us"
@@ -552,9 +567,25 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         // 取当前时间即可：shared/user 顶层 yaml 的 mtime 都早于它 → 不触发自动部署；
         // 用户手动部署走的是强制路径，不受此值影响。
         val nowSeconds = System.currentTimeMillis() / 1000
-        File(rimeUserDir, "user.yaml").writeText("var:\n  last_build_time: $nowSeconds\n")
+        File(rimeUserDir, "user.yaml").writeText(buildUserYaml(nowSeconds))
         marker.writeText(current)
         Timber.i("Rime prebuilt deployment refreshed: ${current.trim().lineSequence().firstOrNull()}")
+    }
+
+    /**
+     * 生成 user.yaml。
+     *
+     * 除 `var/last_build_time` 外还写入 `var/previously_selected_schema`：
+     * 两个发行版（吴语版 / 西安话版）内容完全一致，唯一区别就是这里的默认方案。
+     * librime 启动时按这个键恢复上次使用的方案，因此首次安装即落在各自方案上。
+     *
+     * 只在首次写入（user.yaml 不存在或被本方法覆盖）时生效：
+     * 用户之后自己切换方案，librime 会把新的选择写回同一文件。
+     */
+    private fun buildUserYaml(nowSeconds: Long): String = buildString {
+        append("var:\n")
+        append("  last_build_time: ").append(nowSeconds).append('\n')
+        append("  previously_selected_schema: ").append(BuildConfig.DEFAULT_SCHEME).append('\n')
     }
 
     /**

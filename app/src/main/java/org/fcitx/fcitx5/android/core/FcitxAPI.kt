@@ -110,4 +110,12 @@ interface FcitxAPI {
 
     suspend fun triggerCandidateListTabAction(id: Int)
 
+    /**
+     * 触发 Rime 的一轮部署（等价于用户在方案菜单里点「部署」）。
+     *
+     * 用于「首次调出输入法时自动部署」：装好 APK 后第一次弹出键盘时，
+     * 由输入法自己跑一遍部署，用户无需再手动点一次。
+     */
+    suspend fun deployRime()
+
 }

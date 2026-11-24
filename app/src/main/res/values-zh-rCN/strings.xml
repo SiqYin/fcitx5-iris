@@ -321,4 +321,10 @@
     <string name="keyboard_height_percent_base">键盘高度百分比</string>
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真实尺寸 (Display.getRealSize)</string>
+    <!-- 更新提示 -->
+    <string name="update_available_title">小鸢输入法有新版本</string>
+    <string name="update_available_message">新版本 %1$s 已发布，点击「更新」前往下载。</string>
+    <string name="update_now">更新</string>
+    <string name="update_channel_name">版本更新</string>
+    <string name="update_channel_description">检测到小鸢输入法有新版本时提醒</string>
 </resources>

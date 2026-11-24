@@ -1,6 +1,8 @@
-# 小鸢输入法 Iris Keyboard
-
-![Image 1: Iris Keyboard](https://raw.githubusercontent.com/SiqYin/fcitx5-iris/main/brand/readme-hero-circle.png)
+<div align="center">
+    <img width="200" height="200" src="https://raw.githubusercontent.com/SiqYin/fcitx5-iris/main/brand/readme-hero-circle.png">
+    <h1>小鸢输入法 Iris Keyboard</h1>
+    <p><b>把 Rime 输入引擎与四套方言方案打进一个 APK，装完即用。</b></p>
+</div>
 
 **小鸢输入法**（Iris Keyboard）是 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)（小企鹅输入法）的独立发行版：把 Rime 输入引擎与四套方言方案直接打进**一个 APK**，词库在构建机上预编译好随包分发，安装激活后**开箱即用**——不再需要装插件 APK，也不再需要手动「部署」。
 

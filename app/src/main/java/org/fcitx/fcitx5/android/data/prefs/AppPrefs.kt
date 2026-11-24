@@ -36,6 +36,23 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
         val needNotifications = bool("need_notifications", true)
+
+        /**
+         * 上一次成功自动部署时 APK 的版本戳（buildinfo.txt 内容的 hash）。
+         *
+         * 空串 = 从未自动部署过。每次键盘首次调出时与当前 APK 内的版本戳比对：
+         * 不一致（首次安装、或覆盖升级换了一份词库）就自动跑一轮部署。
+         */
+        val rimeDeployedStamp = string("rime_deployed_stamp", "")
+
+        /**
+         * 已经提醒过的那一版新版本号。
+         *
+         * 语义是「这一版只打扰一次」：通知一旦弹出就立刻写入，
+         * 之后无论用户点了「更新」、点掉通知、还是把通知划掉不管，
+         * 只要最新版仍是这个版本就不再提醒；只有发布了更高版本才会再次提醒。
+         */
+        val updateNotifiedFor = string("update_notified_for", "")
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {

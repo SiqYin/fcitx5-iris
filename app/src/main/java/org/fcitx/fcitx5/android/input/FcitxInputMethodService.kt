@@ -63,6 +63,9 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.update.RimeAutoDeploy
+import org.fcitx.fcitx5.android.input.update.UpdateChecker
+import org.fcitx.fcitx5.android.input.update.UpdateNotifier
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
@@ -775,6 +778,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
         }
+        // 键盘每次被调出：先确保词库已部署（首次使用/覆盖升级后），再查一次更新
+        lifecycleScope.launch { onKeyboardShown() }
     }
 
     override fun onUpdateSelection(
@@ -1095,6 +1100,39 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private var showingDialog: Dialog? = null
+
+    /** 本次进程内是否已做过「自动部署 + 更新检测」，避免每次弹键盘都重复 */
+    private var keyboardShownHandled = false
+
+    /**
+     * 键盘被调出时的后台动作：
+     *
+     * 1. **自动部署**：首次安装/覆盖升级后，APK 里的词库还没落到用户目录，
+     *    Rime 会停在 maintenance 状态，必须手动点一次「部署」才能出字。
+     *    这里在第一次调出时自己跑一轮，用户零操作。
+     *    `RimeAutoDeploy` 内部按 buildinfo 摘要判定，已部署过就立即返回。
+     * 2. **更新检测**：查到更高版本时以**系统通知**提醒（带「更新」按钮），
+     *    不在键盘上弹窗，不打断输入。用户点过「稍后」后同一版本不再提示。
+     */
+    private suspend fun onKeyboardShown() {
+        if (keyboardShownHandled) return
+        keyboardShownHandled = true
+        // 先部署：这一步不依赖网络，且决定能不能打字，优先级高于更新提示
+        runCatching { fcitx.runOnReady { RimeAutoDeploy.ensureDeployed(this) } }
+            .onFailure { Timber.w(it, "auto deploy failed") }
+        // 再查更新：网络失败静默；查到就发通知
+        val update = runCatching { UpdateChecker.checkForUpdate() }.getOrNull() ?: return
+        if (!UpdateNotifier.canNotify()) {
+            Timber.d("onKeyboardShown: notifications not permitted, skip")
+            return
+        }
+        runCatching {
+            UpdateNotifier.show(this, update.latestVersion, update.pageUrl)
+            // 通知已弹出 → 立刻记下这一版，保证「同一版本只提醒一次」：
+            // 用户点「更新」、点掉通知、或划掉不理，都不会再收到同版本提醒
+            UpdateChecker.markNotified(update.latestVersion)
+        }.onFailure { Timber.w(it, "failed to post update notification") }
+    }
 
     fun showDialog(dialog: Dialog) {
         showingDialog?.dismiss()

@@ -54,6 +54,32 @@ android {
         }
     }
 
+    /**
+     * 两个发行版：内容完全一致（同一棵树、同样四个方案），只有
+     *  - applicationId 不同（可并存、互不覆盖）
+     *  - 首次启动时选择的默认方案不同
+     *
+     * 默认方案通过 [BuildConfig] 注入，运行时由 RimeDefaultScheme 写进
+     * rime 的 user.yaml（var/previously_selected_schema）。
+     */
+    flavorDimensions += "edition"
+    productFlavors {
+        create("wugniu") {
+            dimension = "edition"
+            applicationId = "io.github.siqyin.iris.wugniu"
+            buildConfigField("String", "DEFAULT_SCHEME", "\"wugniu_suwu\"")
+            resValue("string", "app_name_release", "小鸢输入法（吴语）")
+            resValue("string", "app_name_debug", "小鸢输入法（吴语·调试）")
+        }
+        create("xinganhua") {
+            dimension = "edition"
+            applicationId = "io.github.siqyin.iris.xinganhua"
+            buildConfigField("String", "DEFAULT_SCHEME", "\"nanjiao\"")
+            resValue("string", "app_name_release", "小鸢输入法（西安话）")
+            resValue("string", "app_name_debug", "小鸢输入法（西安话·调试）")
+        }
+    }
+
     androidResources {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
