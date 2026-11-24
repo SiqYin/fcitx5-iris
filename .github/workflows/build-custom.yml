@@ -24,6 +24,27 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
+      # versionName 必须在构建时确定，且与 Release tag 一致：
+      #  - tag 推送上来的构建：直接用 tag（去掉 v 前缀，如 v1.0.0 → 1.0.0）
+      #  - 普通分支构建：用 git describe（如 v1.0.0 / v1.0.0-3-gabc1234），也去掉 v
+      # 之前依赖 build-logic 里的 `git describe --tags`，一旦在打 tag 之前构建，
+      # versionName 就会变成 `v0.1.1-2-g2c06612` 这种非发布形态，且带 v 前缀会让
+      # 应用内「更新检测」的语义化比较失效。
+      - name: Resolve version name
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RAW="${GITHUB_REF#refs/tags/}"
+          else
+            RAW="$(git describe --tags --always)"
+          fi
+          VERSION="${RAW#v}"
+          VERSION="${VERSION#V}"
+          echo "versionName=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "resolved versionName=$VERSION (from $RAW)"
+
       - name: Setup Android environment
         uses: android-actions/setup-android@v4
         with:
@@ -108,6 +129,7 @@ jobs:
           SIGN_KEY_BASE64: ${{ secrets.SIGN_KEY_BASE64 }}
           SIGN_KEY_PWD: ${{ secrets.SIGN_KEY_PWD }}
           SIGN_KEY_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
+          BUILD_VERSION_NAME: ${{ steps.ver.outputs.versionName }}
         run: |
           set -o pipefail
           if [ -z "$SIGN_KEY_BASE64" ]; then

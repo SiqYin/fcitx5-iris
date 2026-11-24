@@ -116,21 +116,30 @@ object UpdateChecker {
     /**
      * 语义化版本比较：`a` 是否比 `b` 新。
      *
-     * 按 `.` 分段逐段比数字；非数字段（如 `1.0.0-rc1`）退化成字符串比较，
-     * 保证不会因为段数不同而漏判（1.0.1 > 1.0）。
+     * 规则：
+     *  - 先各自剥离 v 前缀；
+     *  - 只比较**数字段**（`.1.2` 部分），预发布/构建后缀（`-2-gabc`、`-rc1`、`+meta`）不参与；
+     *    贪心地逐段比数字，段数不同时缺的补 0（1.0.1 > 1.0）。
+     *
+     * 之所以忽略后缀：`git describe` 产出的 `1.0.0-3-gabc1234` 表示「比 1.0.0 多 3 个提交」，
+     * 它不该被判成比 `1.0.0` 新，也不该影响与 `1.0.1` 的先后。
      */
     internal fun isNewer(a: String, b: String): Boolean {
-        val pa = a.split('.', '-', '+')
-        val pb = b.split('.', '-', '+')
+        val pa = numericSegments(a)
+        val pb = numericSegments(b)
         val n = maxOf(pa.size, pb.size)
         for (i in 0 until n) {
-            val xa = pa.getOrNull(i) ?: "0"
-            val xb = pb.getOrNull(i) ?: "0"
-            val na = xa.toIntOrNull()
-            val nb = xb.toIntOrNull()
-            val cmp = if (na != null && nb != null) na.compareTo(nb) else xa.compareTo(xb)
-            if (cmp != 0) return cmp > 0
+            val na = pa.getOrNull(i) ?: 0
+            val nb = pb.getOrNull(i) ?: 0
+            if (na != nb) return na > nb
         }
         return false
+    }
+
+    /** 取版本号里前导的数字段，例如 `v1.0.0-3-gabc` → [1, 0, 0] */
+    private fun numericSegments(v: String): List<Int> {
+        val core = v.trim().removePrefix("v").removePrefix("V")
+            .substringBefore('-').substringBefore('+')
+        return core.split('.').mapNotNull { it.trim().toIntOrNull() }
     }
 }

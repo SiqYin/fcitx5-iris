@@ -44,7 +44,10 @@ val Project.buildToolsVersion
 val Project.buildVersionName
     get() = ep("BUILD_VERSION_NAME", "buildVersionName") {
         // no --long: built on a tagged commit, versionName equals the tag exactly (e.g. v1.5.9)
+        // 去掉 v 前缀：应用内「更新检测」按语义化版本比较，`1.0.0` 与 release tag
+        // `v1.0.0` 必须能对上，带前缀会让 isNewer 误判。
         runCmd("git describe --tags --always", Versions.baseVersionName)
+            .removePrefix("v").removePrefix("V")
     }
 
 val Project.buildCommitHash
