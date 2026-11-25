@@ -8,25 +8,21 @@
 
 ## 内置方案
 
-两个版本**内容完全一致**，四个方案全部内置：
+四个方案全部内置在同一个 APK 里：
 
 | 方案 | schema | 说明 |
 |---|---|---|
-| 吴语·苏沪混合腔 | `wugniu_suwu` | 全量搜狗词表 |
+| 吴语·苏沪混合腔 | `wugniu_suwu` | **默认方案**，全量搜狗词表 |
 | 吴语拼音文 | `wugniu_lumozy` | 汉字 ⇄ 拼音文互换（复用 `wugniu_suwu` 词典） |
 | 西安话·城区音 | `chengqyu` | 反引号 `` ` `` 普通话拼音反查、全量搜狗词表 |
 | 西安话·南郊音 | `nanjiao` | 与城区音并行，南郊音体系 |
 
 输入法只有两个：**Rime（中州韵）** 与 **English**，其中 Rime 是默认输入法。方案菜单在键盘上按 `Ctrl+`` 或 F4 切换。
 
-## 两个版本
+## 默认方案
 
-| 版本 | 包名 | 默认方案 |
-|---|---|---|
-| **吴语版** | `io.github.siqyin.iris.wugniu` | 吴语·苏沪混合腔 |
-| **西安话版** | `io.github.siqyin.iris.xinganhua` | 西安话·南郊音 |
-
-除默认方案与包名外，两版没有任何差别；包名不同，**可以同时安装**，也可单独使用其中一个。
+四个方案全部内置在同一个 APK 里，**默认方案为「吴语·苏沪混合腔」**，
+其余三个可在方案菜单里随时切换。
 
 方案来源：
 
@@ -36,8 +32,8 @@
 
 ## 下载
 
-见 [Releases](https://github.com/SiqYin/fcitx5-iris/releases)。每个 Release 提供 **8 个 APK**：
-两个版本 × 4 个 ABI，先选版本、再选 ABI（一般手机选 **arm64-v8a**）。
+见 [Releases](https://github.com/SiqYin/fcitx5-iris/releases)。每个 Release 提供 **4 个 APK**，
+对应 4 个 ABI，一般手机选 **arm64-v8a**。
 
 安装后打开应用，按引导在系统设置中启用「小鸢输入法」并切换为默认输入法。
 **首次调出键盘会自动完成部署**，不必再手动点「部署」，直接就能打字。
@@ -57,7 +53,7 @@
 
 - 构建时（CI）在 Ubuntu 上用与安卓包**同版本的 librime**（1.16.1，取自 `lib/fcitx5/src/main/cpp/prebuilt` 子模块）编译 `rime_deployer`，跑 `--build` 把 4 个方案与全部词典编译成 `table/prism/reverse` 产物，连同 `buildinfo.txt` 版本戳打进 APK 的 `assets/usr/share/rime-data/build/`；
 - 该目录正是 librime 的 `prebuilt_data_dir`（`shared_data_dir/build`），运行时加载「已部署资源」的顺序是：手机端 `user_data/build`（无则跳过）→ APK 预置产物；
-- 应用首次启动时（`Fcitx.prepareRimePrebuiltDeployment`）对比 `.iris_buildinfo` 版本：变化则清理手机端旧部署产物并预写 `user.yaml`（`var/last_build_time` 与 `var/previously_selected_schema`），使 librime 的修改检测（`DetectModifications`）直接判定「无修改」，**一次编译都不发生**；两个版本的默认方案差别就写在这里；
+- 应用首次启动时（`Fcitx.prepareRimePrebuiltDeployment`）对比 `.iris_buildinfo` 版本：变化则清理手机端旧部署产物并预写 `user.yaml`（`var/last_build_time` 与 `var/previously_selected_schema`），使 librime 的修改检测（`DetectModifications`）直接判定「无修改」，**一次编译都不发生**；默认方案也在这里写入；
 - 兜底：万一用户目录状态与预期不符（覆盖升级换了词库、用户放过自定义 yaml），键盘**首次调出时会自动跑一轮部署**（`RimeAutoDeploy`），仍然不需要用户手动点「部署」；
 - 词库更新只受 APK 体积约束——在手机上编译大词表导致内存超限的问题从根上消失。
 - **预编译用的 librime 版本必须与 prebuilt 子模块一致**：产物二进制格式随版本变化（1.12 写 `Rime::Prism/3.0`，1.16 要求 `>= 4.0` 并拒绝 3.0）。版本不一致时所有方案 prism 加载失败，表现为「完全打不了字」。
