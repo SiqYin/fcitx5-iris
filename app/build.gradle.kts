@@ -55,29 +55,14 @@ android {
     }
 
     /**
-     * 两个发行版：内容完全一致（同一棵树、同样四个方案），只有
-     *  - applicationId 不同（可并存、互不覆盖）
-     *  - 首次启动时选择的默认方案不同
+     * 单一发行版：四个方案全部内置，默认方案为「吴语·苏沪混合腔」。
      *
-     * 默认方案通过 [BuildConfig] 注入，运行时由 RimeDefaultScheme 写进
-     * rime 的 user.yaml（var/previously_selected_schema）。
+     * 1.0.0/1.0.1 曾经拆成 wugniu / xinganhua 两个 flavor（同内容、仅默认方案与包名不同）。
+     * 1.0.2 起合并回一个版本：包名恢复为 io.github.siqyin.iris，
+     * 默认方案通过 BuildConfig.DEFAULT_SCHEME 注入，运行时写进 rime 的 user.yaml。
      */
-    flavorDimensions += "edition"
-    productFlavors {
-        create("wugniu") {
-            dimension = "edition"
-            applicationId = "io.github.siqyin.iris.wugniu"
-            buildConfigField("String", "DEFAULT_SCHEME", "\"wugniu_suwu\"")
-            resValue("string", "app_name_release", "小鸢输入法（吴语）")
-            resValue("string", "app_name_debug", "小鸢输入法（吴语·调试）")
-        }
-        create("xinganhua") {
-            dimension = "edition"
-            applicationId = "io.github.siqyin.iris.xinganhua"
-            buildConfigField("String", "DEFAULT_SCHEME", "\"nanjiao\"")
-            resValue("string", "app_name_release", "小鸢输入法（西安话）")
-            resValue("string", "app_name_debug", "小鸢输入法（西安话·调试）")
-        }
+    defaultConfig {
+        buildConfigField("String", "DEFAULT_SCHEME", "\"wugniu_suwu\"")
     }
 
     androidResources {

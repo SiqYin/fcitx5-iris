@@ -125,9 +125,8 @@ jobs:
             > "$SRC/rime-wugniu-suwu/build/buildinfo.txt"
           ls -la "$SRC/rime-wugniu-suwu/build"
 
-      # 一次构建两个发行版：iris-wugniu（默认吴语混合腔）与 iris-xinganhua（默认西安话南郊音）。
-      # 两者内容完全一致（同一棵树、同样四个方案），只是 applicationId 与默认方案不同，
-      # 故可并存安装。每个 flavor × 4 ABI = 8 个 APK。
+      # 单一发行版（1.0.2 起）：四个方案全部内置，默认方案吴语·苏沪混合腔。
+      # × 4 个 ABI = 4 个 APK。
       - name: Build Release APK
         shell: bash
         env:
@@ -141,7 +140,7 @@ jobs:
             echo "::error::SIGN_KEY_BASE64 未配置，release 产物将无法签名"
             exit 1
           fi
-          ./gradlew :app:assembleWugniuRelease :app:assembleXinganhuaRelease 2>&1 | tee build-main.log
+          ./gradlew :app:assembleRelease 2>&1 | tee build-main.log
 
       - name: Verify APKs are signed
         shell: bash
@@ -152,21 +151,18 @@ jobs:
             echo "::error::发现未签名产物：$UNSIGNED"
             exit 1
           fi
-          for f in wugniu xinganhua; do
-            n=$(find "app/build/outputs/apk/$f/release" -name '*.apk' 2>/dev/null | wc -l)
-            echo "$f 已签名 APK 数量：$n"
-            if [ "$n" -ne 4 ]; then
-              echo "::error::$f 应有 4 个 ABI APK，实际 $n"
-              exit 1
-            fi
-          done
-          echo "总计：$(find app/build/outputs/apk -path '*/release/*.apk' | wc -l) 个 APK"
+          n=$(find app/build/outputs/apk/release -name '*.apk' 2>/dev/null | wc -l)
+          echo "已签名 APK 数量：$n"
+          if [ "$n" -ne 4 ]; then
+            echo "::error::应有 4 个 ABI APK，实际 $n"
+            exit 1
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
         with:
           name: iris-keyboard-apk
-          path: app/build/outputs/apk/*/release/
+          path: app/build/outputs/apk/release/
 
       - name: Save failure log to ci-logs branch
         if: failure()
